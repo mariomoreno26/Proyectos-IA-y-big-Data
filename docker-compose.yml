@@ -16,9 +16,7 @@ services:
       - "9870:9870"   # UI web NameNode
       - "8020:8020"   # RPC HDFS
     environment:
-      ENSURE_NAMENODE_DIR: "/tmp/hadoop-root/dfs/name"
-    volumes:
-      - namenode-data:/tmp/hadoop-root/dfs/name
+      ENSURE_NAMENODE_DIR: "/tmp/hadoop-hadoop/dfs/name"   # corregido (era hadoop-root)
     restart: unless-stopped
 
   datanode:
@@ -28,8 +26,6 @@ services:
     command: ["hdfs", "datanode"]
     ports:
       - "9864:9864"   # UI web DataNode
-    volumes:
-      - datanode-data:/tmp/hadoop-root/dfs/data
     depends_on: [namenode]
     restart: unless-stopped
 
@@ -129,6 +125,25 @@ services:
     networks: [bigdata-net]
     restart: unless-stopped
 
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_ventas
+    hostname: mysql_ventas
+    # native_password evita problemas de autenticación con el driver JDBC de Sqoop
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: ventas_db
+      MYSQL_USER: sqoopuser
+      MYSQL_PASSWORD: sqooppassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks: [bigdata-net]
+    restart: unless-stopped
+
   # ---------------- ANACONDA + JUPYTER ----------------
   jupyter:
     build: ./jupyter
@@ -151,14 +166,26 @@ services:
     depends_on: [spark-master, namenode, kafka, mongodb, postgres]
     networks: [bigdata-net]
     restart: unless-stopped
+  # ---------------- SQOOP ----------------
+  sqoop:
+    build: ./sqoop
+    container_name: sqoop
+    hostname: sqoop
+    environment:
+      HADOOP_COMMON_HOME: /opt/hadoop
+      HADOOP_MAPRED_HOME: /opt/hadoop
+    networks: [bigdata-net]
+    depends_on:
+      - namenode
+      - mysql
+    restart: unless-stopped
 
 networks:
   bigdata-net:
     driver: bridge
 
 volumes:
-  namenode-data:
-  datanode-data:
   kafka-data:
   mongo-data:
   postgres-data:
+  mysql-data:
